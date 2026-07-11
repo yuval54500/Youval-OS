@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yuval OS - ניהול משימות חכם</title>
+    <title>Youval OS - ניהול משימות חכם</title>
+    <!-- Google API Script -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     <style>
         :root {
             --bg-color: #f4f7f6;
@@ -46,7 +49,6 @@
         .btn:hover { opacity: 0.9; }
         .btn-danger { background-color: #d9534f; }
         .btn-success { background-color: #5cb85c; }
-        .btn-warning { background-color: #f0ad4e; }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -117,12 +119,13 @@
 <div class="container">
     <div class="header">
         <div>
-            <h1>📋 Yuval OS</h1>
+            <h1>📋 Youval OS</h1>
             <p>ניהול החיים המשותפים של יובל ואליען</p>
         </div>
         <div>
-            <button class="btn btn-warning" onclick="exportToCalendar('personal')">📥 ייצא ליומן אישי</button>
-            <button class="btn btn-success" onclick="exportToCalendar('shared')">📥 ייצא ליומן משותף</button>
+            <button id="auth_btn" class="btn btn-success" onclick="handleAuthClick()">🔘 התחבר לחשבון גוגל</button>
+            <button id="signout_btn" class="btn btn-danger" style="display:none;" onclick="handleSignoutClick()">נתק חשבון</button>
+            <span id="status_span" style="font-weight: bold; color: #5cb85c; display: none; margin-right: 10px;">✓ מחובר אוטומטית לגוגל</span>
         </div>
     </div>
 
@@ -190,7 +193,7 @@
                     <option value="10">כל 10 לחודש</option>
                 </select>
             </div>
-            <button class="btn btn-success" onclick="saveTask()">💾 שמור משימה</button>
+            <button class="btn btn-success" onclick="saveTask()">💾 שמור וסנכרן אוטומטית</button>
         </div>
     </div>
 
@@ -201,6 +204,13 @@
 </div>
 
 <script>
+    const CLIENT_ID = '463558988822-cnivo10o2issnin8lmlh694at3s4ropp.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+
+    let tokenClient;
+    let gapiInited = false;
+    let gsiInited = false;
+
     let data = JSON.parse(localStorage.getItem('yuval_os_data')) || { categories: {}, tasks: [] };
     const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
 
@@ -282,6 +292,10 @@
         data.tasks.push(task);
         document.getElementById('task_text').value = '';
         saveData();
+
+        if (gapiInited && gapi.client.calendar && gapi.client.getToken() !== null) {
+            sendEventToGoogle(task);
+        }
     }
 
     function completeTask(id) {
@@ -308,40 +322,52 @@
         });
     }
 
-    // --- מנגנון ייצוא מקצועי לקובצי יומן סטנדרטיים ---
-    function exportToCalendar(targetType) {
-        const filteredTasks = data.tasks.filter(t => t.target === targetType && t.date);
-        if (filteredTasks.length === 0) {
-            alert('אין משימות עם תאריך יעד המיועדות ליומן זה.');
-            return;
-        }
-
-        let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Yuval OS//Task Manager//HE\n";
-        
-        filteredTasks.forEach(task => {
-            const cleanDate = task.date.replace(/-/g, '');
-            icsContent += "BEGIN:VEVENT\n";
-            icsContent += `SUMMARY:${task.text}\n`;
-            icsContent += `DESCRIPTION:קטגוריה: ${task.cat || 'כללי'} ${task.subCat ? '> ' + task.subCat : ''}\n`;
-            icsContent += `DTSTART;VALUE=DATE:${cleanDate}\n`;
-            icsContent += `DTEND;VALUE=DATE:${cleanDate}\n`;
-            icsContent += "END:VEVENT\n";
+    // --- Google Calendar Integration ---
+    function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+    async function initializeGapiClient() {
+        await gapi.client.init({ discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/discovery"], });
+        gapiInited = true;
+    }
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID, scope: SCOPES, callback: '',
         });
-        
-        icsContent += "END:VCALENDAR";
+        gsiInited = true;
+    }
+    function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) throw (resp);
+            document.getElementById('auth_btn').style.display = 'none';
+            document.getElementById('status_span').style.display = 'inline';
+            document.getElementById('signout_btn').style.display = 'inline-block';
+        };
+        if (gapi.client.getToken() === null) { tokenClient.requestAccessToken({prompt: 'consent'}); } 
+        else { tokenClient.requestAccessToken({prompt: ''}); }
+    }
+    function handleSignoutClick() {
+        const token = gapi.client.getToken();
+        if (token !== null) { google.accounts.oauth2.revoke(token.access_token); gapi.client.setToken(null); }
+        document.getElementById('auth_btn').style.display = 'inline-block';
+        document.getElementById('status_span').style.display = 'none';
+        document.getElementById('signout_btn').style.display = 'none';
+    }
 
-        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", targetType === 'shared' ? 'shared_calendar.ics' : 'personal_calendar.ics');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    async function sendEventToGoogle(task) {
+        const event = {
+            'summary': task.text,
+            'description': `קטגוריה: ${task.cat} > ${task.subCat || 'כללי'}`,
+            'start': { 'date': task.date || new Date().toISOString().split('T')[0] },
+            'end': { 'date': task.date || new Date().toISOString().split('T')[0] }
+        };
+        const calendarId = 'primary'; 
+        await gapi.client.calendar.events.insert({ 'calendarId': calendarId, 'resource': event });
     }
 
     window.onload = () => {
         renderCategories();
         renderTasks();
+        gapiLoaded();
+        gisLoaded();
     };
 </script>
 </body>
