@@ -184,12 +184,12 @@
             <div class="form-group" id="recurring_field" style="display:none;">
                 <label>כל כמה זמן היא חוזרת?</label>
                 <select id="recurring_period" class="form-control">
-                    <option value="1">כל יום ראשון</option>
-                    <option value="2">כל יום שני</option>
-                    <option value="3">כל יום שלישי</option>
-                    <option value="4">כל יום רביעי</option>
-                    <option value="5">כל יום חמישי</option>
-                    <option value="6">כל יום שישי</option>
+                    <option value="MO">כל יום שני</option>
+                    <option value="TU">כל יום שלישי</option>
+                    <option value="WE">כל יום רביעי</option>
+                    <option value="TH">כל יום חמישי</option>
+                    <option value="FR">כל יום שישי</option>
+                    <option value="SU">כל יום ראשון</option>
                     <option value="10">כל 10 לחודש</option>
                 </select>
             </div>
@@ -352,13 +352,43 @@
         document.getElementById('signout_btn').style.display = 'none';
     }
 
+    // פונקציית עזר לחישוב תאריך התחלה למשימות מחזוריות
+    function getNextStartDate(target) {
+        const today = new Date();
+        if (target === "10") {
+            let targetDate = new Date(today.getFullYear(), today.getMonth(), 10);
+            if (today.getDate() > 10) { targetDate.setMonth(targetDate.getMonth() + 1); }
+            return targetDate.toISOString().split('T')[0];
+        }
+        const days = { 'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5 };
+        const targetDay = days[target];
+        const resultDate = new Date(today);
+        resultDate.setDate(today.getDate() + (targetDay + 7 - today.getDay()) % 7);
+        if (resultDate.toDateString() === today.toDateString()) { resultDate.setDate(resultDate.getDate() + 7); }
+        return resultDate.toISOString().split('T')[0];
+    }
+
     async function sendEventToGoogle(task) {
-        const event = {
+        let event = {
             'summary': task.text,
-            'description': `קטגוריה: ${task.cat} > ${task.subCat || 'כללי'}`,
-            'start': { 'date': task.date || new Date().toISOString().split('T')[0] },
-            'end': { 'date': task.date || new Date().toISOString().split('T')[0] }
+            'description': `קטגוריה: ${task.cat || 'כללי'} ${task.subCat ? '> ' + task.subCat : ''}`,
         };
+
+        if (task.type === 'once') {
+            event.start = { 'date': task.date || new Date().toISOString().split('T')[0] };
+            event.end = { 'date': task.date || new Date().toISOString().split('T')[0] };
+        } else {
+            // משימה מחזורית
+            const calculatedDate = getNextStartDate(task.recurring);
+            event.start = { 'date': calculatedDate };
+            event.end = { 'date': calculatedDate };
+            if (task.recurring === '10') {
+                event.recurrence = ['RRULE:FREQ=MONTHLY;BYMONTHDAY=10'];
+            } else {
+                event.recurrence = [`RRULE:FREQ=WEEKLY;BYDAY=${task.recurring}`];
+            }
+        }
+
         const calendarId = 'primary'; 
         await gapi.client.calendar.events.insert({ 'calendarId': calendarId, 'resource': event });
     }
