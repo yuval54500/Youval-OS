@@ -364,9 +364,14 @@
         const subCat = document.getElementById('task_sub_cat_select').value;
         const target = document.getElementById('calendar_target').value;
         const type = document.getElementById('task_type').value;
-        const date = document.getElementById('task_date').value;
+        let date = document.getElementById('task_date').value;
         const recurring = document.getElementById('recurring_period').value;
         if (!text) return;
+
+        // חישוב תאריך התחלתי למשימה מחזורית כדי שיוצג נכון באתר
+        if (type === 'recurring' && !date) {
+            date = getNextStartDate(recurring);
+        }
 
         const task = { id: Date.now(), text, cat, subCat, target, type, date, recurring, completed: false };
         
@@ -383,7 +388,19 @@
 
     function completeTask(id) {
         const task = data.tasks.find(t => t.id === id);
-        if (task) { task.completed = true; saveData(); }
+        if (task) {
+            if (task.type === 'recurring') {
+                // משימה מחזורית: מקפיצים את התאריך שלה שבוע אחד קדימה באתר
+                let currentDate = new Date(task.date);
+                currentDate.setDate(currentDate.getDate() + 7);
+                task.date = currentDate.toISOString().split('T')[0];
+                alert(`כל הכבוד אחי! המשימה המחזורית עודכנה לשבוע הבא: ${task.date}`);
+            } else {
+                // משימה רגילה: מסמנים כהושלמה
+                task.completed = true;
+            }
+            saveData();
+        }
     }
 
     function deleteTask(id) {
@@ -404,7 +421,6 @@
             return;
         }
 
-        // הגדרת סדר קבוצות - קודם כל הקטגוריות הקיימות, ובסוף "ללא קטגוריה"
         const categoriesToGroup = [...Object.keys(data.categories), ''];
 
         categoriesToGroup.forEach(catName => {
@@ -412,7 +428,6 @@
             
             if (catTasks.length === 0) return;
 
-            // מיון כרונולוגי לפי תאריך
             catTasks.sort((a, b) => {
                 if (!a.date) return 1;
                 if (!b.date) return -1;
@@ -433,7 +448,7 @@
             catTasks.forEach(task => {
                 let badgeHtml = task.cat ? `<span class="badge" style="background-color:${borderCol}">${task.cat}</span>` : '';
                 if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${borderCol}cc">${task.subCat}</span>`;
-                let timeInfo = task.type === 'once' ? `📅 יעד: ${task.date}` : `🔄 מחזורי`;
+                let timeInfo = task.type === 'once' ? `📅 יעד: ${task.date}` : `🔄 מחזורי (הבא: ${task.date})`;
                 
                 let actionButtons = currentTab === 'open' ? 
                     `<div>
