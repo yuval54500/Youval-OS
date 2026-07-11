@@ -113,6 +113,14 @@
             color: white;
             margin-left: 5px;
         }
+        .task-date-display {
+            font-weight: bold;
+            color: #2c3e50;
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
         .cat-badge-list {
             display: flex;
             flex-wrap: wrap;
@@ -368,7 +376,6 @@
         const recurring = document.getElementById('recurring_period').value;
         if (!text) return;
 
-        // חישוב תאריך התחלתי למשימה מחזורית כדי שיוצג נכון באתר
         if (type === 'recurring' && !date) {
             date = getNextStartDate(recurring);
         }
@@ -390,13 +397,18 @@
         const task = data.tasks.find(t => t.id === id);
         if (task) {
             if (task.type === 'recurring') {
-                // משימה מחזורית: מקפיצים את התאריך שלה שבוע אחד קדימה באתר
-                let currentDate = new Date(task.date);
-                currentDate.setDate(currentDate.getDate() + 7);
-                task.date = currentDate.toISOString().split('T')[0];
-                alert(`כל הכבוד אחי! המשימה המחזורית עודכנה לשבוע הבא: ${task.date}`);
+                // תיקון מקצועי: שימוש באובייקט תאריך אמיתי לחישוב שבוע קדימה
+                let d = new Date(task.date);
+                d.setDate(d.getDate() + 7);
+                
+                // המרה חזרה למחרוזת נקייה YYYY-MM-DD
+                let year = d.getFullYear();
+                let month = String(d.getMonth() + 1).padStart(2, '0');
+                let day = String(d.getDate()).padStart(2, '0');
+                
+                task.date = `${year}-${month}-${day}`;
+                alert(`בוצע אחי! המועד הבא עודכן ליום: ${task.date}`);
             } else {
-                // משימה רגילה: מסמנים כהושלמה
                 task.completed = true;
             }
             saveData();
@@ -448,8 +460,11 @@
             catTasks.forEach(task => {
                 let badgeHtml = task.cat ? `<span class="badge" style="background-color:${borderCol}">${task.cat}</span>` : '';
                 if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${borderCol}cc">${task.subCat}</span>`;
-                let timeInfo = task.type === 'once' ? `📅 יעד: ${task.date}` : `🔄 מחזורי (הבא: ${task.date})`;
                 
+                // הצגת תאריך ברורה ומודגשת
+                let dateBadge = task.date ? `<span class="task-date-display">📅 תאריך: ${task.date}</span>` : `<span class="task-date-display">ללא תאריך</span>`;
+                let typeLabel = task.type === 'once' ? `חד-פעמי` : `🔄 מחזורי`;
+
                 let actionButtons = currentTab === 'open' ? 
                     `<div>
                         <button class="btn btn-success btn-small" onclick="completeTask(${task.id})">✓ בוצע</button>
@@ -461,7 +476,11 @@
                     <li class="task-item" style="border-right: 6px solid ${borderCol}; border-left: 1px solid #eee; background: var(--card-bg); padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
                         <div class="task-details">
                             <strong style="${task.completed ? 'text-decoration: line-through; color: #888;' : ''}">${task.text}</strong>
-                            <div>${badgeHtml} <span style="font-size:12px; color:#666; margin-right:10px;">${timeInfo} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'}</span></div>
+                            <div style="margin-top: 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                ${badgeHtml} 
+                                ${dateBadge}
+                                <span style="font-size:12px; color:#666;">(${typeLabel} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'})</span>
+                            </div>
                         </div>
                         ${actionButtons}
                     </li>`;
@@ -472,7 +491,7 @@
         });
     }
 
-    // --- Google Identity Services (Direct Fetch Approach) ---
+    // --- Google Identity Services ---
     function gisLoaded() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID, scope: SCOPES, callback: (resp) => {
