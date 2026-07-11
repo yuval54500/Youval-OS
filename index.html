@@ -149,6 +149,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            font-weight: bold;
         }
         .no-tasks-msg {
             color: #888;
@@ -396,7 +397,6 @@
         const mainContainer = document.getElementById('tasks_grouped_container');
         mainContainer.innerHTML = '';
         
-        // סינון ראשוני לפי לשונית (פתוחות או סגורות)
         const filteredTasks = data.tasks.filter(t => currentTab === 'open' ? !t.completed : t.completed);
 
         if (filteredTasks.length === 0) {
@@ -404,36 +404,32 @@
             return;
         }
 
-        // יצירת רשימת קטגוריות לקיבוץ (כולל "ללא קטגוריה")
+        // הגדרת סדר קבוצות - קודם כל הקטגוריות הקיימות, ובסוף "ללא קטגוריה"
         const categoriesToGroup = [...Object.keys(data.categories), ''];
 
         categoriesToGroup.forEach(catName => {
-            // סינון המשימות ששייכות לקטגוריה הנוכחית
             const catTasks = filteredTasks.filter(t => t.cat === catName);
             
-            if (catTasks.length === 0) return; // אם אין משימות בקטגוריה הזו, לא מציגים אותה
+            if (catTasks.length === 0) return;
 
-            // מיון משימות בתוך הקטגוריה לפי תאריך (משימות בלי תאריך מגיעות לסוף)
+            // מיון כרונולוגי לפי תאריך
             catTasks.sort((a, b) => {
                 if (!a.date) return 1;
                 if (!b.date) return -1;
                 return new Date(a.date) - new Date(b.date);
             });
 
-            // הגדרת כותרת וצבע לקטגוריה
             const displayTitle = catName ? `📂 קטגוריה: ${catName}` : `⚪ ללא קטגוריה`;
             const borderCol = catName && data.categories[catName] ? data.categories[catName].color : '#ccc';
 
-            // יצירת סקשן ויזואלי לקטגוריה
             let sectionHtml = `
-                <div class="category-section">
-                    <div class="category-section-title" style="color: ${borderCol}; border-bottom-color: ${borderCol}44">
+                <div class="category-section" style="margin-bottom: 20px;">
+                    <div class="category-section-title" style="color: ${borderCol}; border-bottom: 2px solid ${borderCol}44;">
                         ${displayTitle} (${catTasks.length})
                     </div>
-                    <ul class="task-list">
+                    <ul class="task-list" style="padding: 0; list-style: none;">
             `;
 
-            // ריצה על המשימות שבתוך הקטגוריה ורינדור שלהן
             catTasks.forEach(task => {
                 let badgeHtml = task.cat ? `<span class="badge" style="background-color:${borderCol}">${task.cat}</span>` : '';
                 if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${borderCol}cc">${task.subCat}</span>`;
@@ -447,7 +443,7 @@
                     `<button class="btn btn-danger btn-small" onclick="deleteTask(${task.id})">🗑️ מחק מההיסטוריה</button>`;
 
                 sectionHtml += `
-                    <li class="task-item" style="border-right-color: ${borderCol}">
+                    <li class="task-item" style="border-right: 6px solid ${borderCol}; border-left: 1px solid #eee; background: var(--card-bg); padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; justify-content: space-between; align-items: center;">
                         <div class="task-details">
                             <strong style="${task.completed ? 'text-decoration: line-through; color: #888;' : ''}">${task.text}</strong>
                             <div>${badgeHtml} <span style="font-size:12px; color:#666; margin-right:10px;">${timeInfo} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'}</span></div>
