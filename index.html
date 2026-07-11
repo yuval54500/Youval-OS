@@ -248,6 +248,7 @@
     let tokenClient;
     let accessToken = null;
     let currentTab = 'open';
+    let pendingTask = null; // משתנה לשמירת משימה שממתינה לחיבור
 
     let data = JSON.parse(localStorage.getItem('yuval_os_data')) || { categories: {}, tasks: [] };
     const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
@@ -351,14 +352,17 @@
         if (!text) return;
 
         const task = { id: Date.now(), text, cat, subCat, target, type, date, recurring, completed: false };
-        data.tasks.push(task);
-        document.getElementById('task_text').value = '';
-        saveData();
-
+        
+        // אם כבר יש לנו חיבור גוגל פעיל, שולחים מיד
         if (accessToken) {
+            data.tasks.push(task);
+            document.getElementById('task_text').value = '';
+            saveData();
             sendEventToGoogleDirectly(task);
         } else {
-            alert("המשימה נשמרה באתר, אך אינך מחובר לגוגל. לחץ על כפתור החיבור בראש העמוד כדי לסנכרן.");
+            // אם אין חיבור, שומרים את המשימה בצד ומבקשים חיבור מיידי
+            pendingTask = task;
+            tokenClient.requestAccessToken({prompt: ''});
         }
     }
 
@@ -413,6 +417,15 @@
                 document.getElementById('auth_btn').style.display = 'none';
                 document.getElementById('status_span').style.display = 'inline';
                 document.getElementById('signout_btn').style.display = 'inline-block';
+                
+                // אם הגענו לכאן בעקבות לחיצה על שמירה, נשלח את המשימה הממתינה
+                if (pendingTask) {
+                    data.tasks.push(pendingTask);
+                    document.getElementById('task_text').value = '';
+                    saveData();
+                    sendEventToGoogleDirectly(pendingTask);
+                    pendingTask = null;
+                }
             },
         });
     }
@@ -484,7 +497,7 @@
             } else {
                 const errData = await response.json();
                 console.error(errData);
-                alert("גוגל דחה את הבקשה. ודא שיש לך הרשאות כתיבה ביומן זה.");
+                alert(`גוגל דחה את הבקשה: ${errData.error.message || 'ודא שיש לך הרשאות כתיבה'}`);
             }
         } catch (error) {
             console.error(error);
