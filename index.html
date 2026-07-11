@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Youval OS - ניהול משימות חכם</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
     <style>
         :root {
             --bg-color: #f4f7f6;
@@ -247,8 +246,7 @@
     const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 
     let tokenClient;
-    let gapiInited = false;
-    let gsiInited = false;
+    let accessToken = null;
     let currentTab = 'open';
 
     let data = JSON.parse(localStorage.getItem('yuval_os_data')) || { categories: {}, tasks: [] };
@@ -357,8 +355,10 @@
         document.getElementById('task_text').value = '';
         saveData();
 
-        if (gapiInited && gapi.client.calendar && gapi.client.getToken() !== null) {
-            sendEventToGoogle(task);
+        if (accessToken) {
+            sendEventToGoogleDirectly(task);
+        } else {
+            alert("המשימה נשמרה באתר, אך אינך מחובר לגוגל. לחץ על כפתור החיבור בראש העמוד כדי לסנכרן.");
         }
     }
 
@@ -404,31 +404,28 @@
         });
     }
 
-    // --- Google Calendar Integration ---
-    function gapiLoaded() { gapi.load('client', initializeGapiClient); }
-    async function initializeGapiClient() {
-        await gapi.client.init({ discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/discovery"], });
-        gapiInited = true;
-    }
+    // --- Google Identity Services (Direct Fetch Approach) ---
     function gisLoaded() {
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID, scope: SCOPES, callback: '',
+            client_id: CLIENT_ID, scope: SCOPES, callback: (resp) => {
+                if (resp.error !== undefined) throw (resp);
+                accessToken = resp.access_token;
+                document.getElementById('auth_btn').style.display = 'none';
+                document.getElementById('status_span').style.display = 'inline';
+                document.getElementById('signout_btn').style.display = 'inline-block';
+            },
         });
-        gsiInited = true;
     }
+    
     function handleAuthClick() {
-        tokenClient.callback = async (resp) => {
-            if (resp.error !== undefined) throw (resp);
-            document.getElementById('auth_btn').style.display = 'none';
-            document.getElementById('status_span').style.display = 'inline';
-            document.getElementById('signout_btn').style.display = 'inline-block';
-        };
-        if (gapi.client.getToken() === null) { tokenClient.requestAccessToken({prompt: 'consent'}); } 
-        else { tokenClient.requestAccessToken({prompt: ''}); }
+        tokenClient.requestAccessToken({prompt: 'consent'});
     }
+    
     function handleSignoutClick() {
-        const token = gapi.client.getToken();
-        if (token !== null) { google.accounts.oauth2.revoke(token.access_token); gapi.client.setToken(null); }
+        if (accessToken !== null) { 
+            google.accounts.oauth2.revoke(accessToken); 
+            accessToken = null; 
+        }
         document.getElementById('auth_btn').style.display = 'inline-block';
         document.getElementById('status_span').style.display = 'none';
         document.getElementById('signout_btn').style.display = 'none';
@@ -449,19 +446,19 @@
         return resultDate.toISOString().split('T')[0];
     }
 
-    async function sendEventToGoogle(task) {
+    async function sendEventToGoogleDirectly(task) {
         let event = {
             'summary': task.text,
             'description': `קטגוריה: ${task.cat || 'כללי'} ${task.subCat ? '> ' + task.subCat : ''}`,
         };
 
         if (task.type === 'once') {
-            event.start = { 'date': task.date || new Date().toISOString().split('T')[0] };
-            event.end = { 'date': task.date || new Date().toISOString().split('T')[0] };
+            event.start = { 'date': task.date || new Date().toISOString().split('T')[0], 'timeZone': 'Asia/Jerusalem' };
+            event.end = { 'date': task.date || new Date().toISOString().split('T')[0], 'timeZone': 'Asia/Jerusalem' };
         } else {
             const calculatedDate = getNextStartDate(task.recurring);
-            event.start = { 'date': calculatedDate };
-            event.end = { 'date': calculatedDate };
+            event.start = { 'date': calculatedDate, 'timeZone': 'Asia/Jerusalem' };
+            event.end = { 'date': calculatedDate, 'timeZone': 'Asia/Jerusalem' };
             if (task.recurring === '10') {
                 event.recurrence = ['RRULE:FREQ=MONTHLY;BYMONTHDAY=10'];
             } else {
@@ -469,21 +466,35 @@
             }
         }
 
-        // שימוש במזהים המדויקים שלך אחי
-        const calendarId = task.target === 'shared' ? SHARED_CALENDAR_ID : PERSONAL_CALENDAR_ID; 
+        const calendarId = task.target === 'shared' ? encodeURIComponent(SHARED_CALENDAR_ID) : encodeURIComponent(PERSONAL_CALENDAR_ID); 
+        const url = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`;
+
         try {
-            await gapi.client.calendar.events.insert({ 'calendarId': calendarId, 'resource': event });
-            alert(`המשימה "${task.text}" סונכרנה בהצלחה ליומן ה${task.target === 'shared' ? 'משותף' : 'אישי'}!`);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(event)
+            });
+
+            if (response.ok) {
+                alert(`המשימה "${task.text}" סונכרנה ישירות ובאופן אוטומטי ליומן!`);
+            } else {
+                const errData = await response.json();
+                console.error(errData);
+                alert("גוגל דחה את הבקשה. ודא שיש לך הרשאות כתיבה ביומן זה.");
+            }
         } catch (error) {
             console.error(error);
-            alert("שגיאה בסנכרון. ודא שאישרת גישה בחלון גוגל ושהחיבור ירוק.");
+            alert("שגיאת רשת בשליחה לגוגל.");
         }
     }
 
     window.onload = () => {
         renderCategories();
         renderTasks();
-        gapiLoaded();
         gisLoaded();
     };
 </script>
