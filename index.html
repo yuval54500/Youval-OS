@@ -85,6 +85,7 @@
         .task-list {
             list-style: none;
             padding: 0;
+            margin-bottom: 25px;
         }
         .task-item {
             background: var(--card-bg);
@@ -96,6 +97,7 @@
             justify-content: space-between;
             align-items: center;
             border-right: 6px solid #ccc;
+            border-left: 1px solid #eee;
         }
         .task-details {
             display: flex;
@@ -138,6 +140,20 @@
         .tab-btn.active {
             color: var(--primary-color);
             border-bottom: 3px solid var(--primary-color);
+        }
+        .category-section-title {
+            font-size: 18px;
+            margin: 20px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .no-tasks-msg {
+            color: #888;
+            font-style: italic;
+            margin-bottom: 15px;
         }
     </style>
 </head>
@@ -235,7 +251,7 @@
             <button id="tab_open" class="tab-btn active" onclick="switchTab('open')">📌 משימות פתוחות</button>
             <button id="tab_completed" class="tab-btn" onclick="switchTab('completed')">✅ משימות שהושלמו</button>
         </div>
-        <ul id="tasks_container" class="task-list"></ul>
+        <div id="tasks_grouped_container"></div>
     </div>
 </div>
 
@@ -248,7 +264,7 @@
     let tokenClient;
     let accessToken = null;
     let currentTab = 'open';
-    let pendingTask = null; // משתנה לשמירת משימה שממתינה לחיבור
+    let pendingTask = null;
 
     let data = JSON.parse(localStorage.getItem('yuval_os_data')) || { categories: {}, tasks: [] };
     const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
@@ -353,14 +369,12 @@
 
         const task = { id: Date.now(), text, cat, subCat, target, type, date, recurring, completed: false };
         
-        // אם כבר יש לנו חיבור גוגל פעיל, שולחים מיד
         if (accessToken) {
             data.tasks.push(task);
             document.getElementById('task_text').value = '';
             saveData();
             sendEventToGoogleDirectly(task);
         } else {
-            // אם אין חיבור, שומרים את המשימה בצד ומבקשים חיבור מיידי
             pendingTask = task;
             tokenClient.requestAccessToken({prompt: ''});
         }
@@ -379,32 +393,71 @@
     }
 
     function renderTasks() {
-        const container = document.getElementById('tasks_container');
-        container.innerHTML = '';
+        const mainContainer = document.getElementById('tasks_grouped_container');
+        mainContainer.innerHTML = '';
         
-        const filtered = data.tasks.filter(t => currentTab === 'open' ? !t.completed : t.completed);
+        // סינון ראשוני לפי לשונית (פתוחות או סגורות)
+        const filteredTasks = data.tasks.filter(t => currentTab === 'open' ? !t.completed : t.completed);
 
-        filtered.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(task => {
-            const catColor = task.cat && data.categories[task.cat] ? data.categories[task.cat].color : '#ccc';
-            let badgeHtml = task.cat ? `<span class="badge" style="background-color:${catColor}">${task.cat}</span>` : '';
-            if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${catColor}cc">${task.subCat}</span>`;
-            let timeInfo = task.type === 'once' ? `📅 יעד: ${task.date}` : `🔄 מחזורי`;
+        if (filteredTasks.length === 0) {
+            mainContainer.innerHTML = `<div class="no-tasks-msg">אין משימות להצגה בלשונית זו.</div>`;
+            return;
+        }
+
+        // יצירת רשימת קטגוריות לקיבוץ (כולל "ללא קטגוריה")
+        const categoriesToGroup = [...Object.keys(data.categories), ''];
+
+        categoriesToGroup.forEach(catName => {
+            // סינון המשימות ששייכות לקטגוריה הנוכחית
+            const catTasks = filteredTasks.filter(t => t.cat === catName);
             
-            let actionButtons = currentTab === 'open' ? 
-                `<div>
-                    <button class="btn btn-success btn-small" onclick="completeTask(${task.id})">✓ בוצע</button>
-                    <button class="btn btn-danger btn-small" onclick="deleteTask(${task.id})">🗑️ מחק</button>
-                </div>` : 
-                `<button class="btn btn-danger btn-small" onclick="deleteTask(${task.id})">🗑️ מחק מההיסטוריה</button>`;
+            if (catTasks.length === 0) return; // אם אין משימות בקטגוריה הזו, לא מציגים אותה
 
-            container.innerHTML += `
-                <li class="task-item" style="border-right-color: ${catColor}">
-                    <div class="task-details">
-                        <strong style="${task.completed ? 'text-decoration: line-through; color: #888;' : ''}">${task.text}</strong>
-                        <div>${badgeHtml} <span style="font-size:12px; color:#666; margin-right:10px;">${timeInfo} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'}</span></div>
+            // מיון משימות בתוך הקטגוריה לפי תאריך (משימות בלי תאריך מגיעות לסוף)
+            catTasks.sort((a, b) => {
+                if (!a.date) return 1;
+                if (!b.date) return -1;
+                return new Date(a.date) - new Date(b.date);
+            });
+
+            // הגדרת כותרת וצבע לקטגוריה
+            const displayTitle = catName ? `📂 קטגוריה: ${catName}` : `⚪ ללא קטגוריה`;
+            const borderCol = catName && data.categories[catName] ? data.categories[catName].color : '#ccc';
+
+            // יצירת סקשן ויזואלי לקטגוריה
+            let sectionHtml = `
+                <div class="category-section">
+                    <div class="category-section-title" style="color: ${borderCol}; border-bottom-color: ${borderCol}44">
+                        ${displayTitle} (${catTasks.length})
                     </div>
-                    ${actionButtons}
-                </li>`;
+                    <ul class="task-list">
+            `;
+
+            // ריצה על המשימות שבתוך הקטגוריה ורינדור שלהן
+            catTasks.forEach(task => {
+                let badgeHtml = task.cat ? `<span class="badge" style="background-color:${borderCol}">${task.cat}</span>` : '';
+                if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${borderCol}cc">${task.subCat}</span>`;
+                let timeInfo = task.type === 'once' ? `📅 יעד: ${task.date}` : `🔄 מחזורי`;
+                
+                let actionButtons = currentTab === 'open' ? 
+                    `<div>
+                        <button class="btn btn-success btn-small" onclick="completeTask(${task.id})">✓ בוצע</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteTask(${task.id})">🗑️ מחק</button>
+                    </div>` : 
+                    `<button class="btn btn-danger btn-small" onclick="deleteTask(${task.id})">🗑️ מחק מההיסטוריה</button>`;
+
+                sectionHtml += `
+                    <li class="task-item" style="border-right-color: ${borderCol}">
+                        <div class="task-details">
+                            <strong style="${task.completed ? 'text-decoration: line-through; color: #888;' : ''}">${task.text}</strong>
+                            <div>${badgeHtml} <span style="font-size:12px; color:#666; margin-right:10px;">${timeInfo} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'}</span></div>
+                        </div>
+                        ${actionButtons}
+                    </li>`;
+            });
+
+            sectionHtml += `</ul></div>`;
+            mainContainer.innerHTML += sectionHtml;
         });
     }
 
@@ -418,7 +471,6 @@
                 document.getElementById('status_span').style.display = 'inline';
                 document.getElementById('signout_btn').style.display = 'inline-block';
                 
-                // אם הגענו לכאן בעקבות לחיצה על שמירה, נשלח את המשימה הממתינה
                 if (pendingTask) {
                     data.tasks.push(pendingTask);
                     document.getElementById('task_text').value = '';
