@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuval OS - ניהול משימות חכם</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --primary-color: #4a90e2;
+            --border-radius: 12px;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-danger { background-color: #d9534f; }
+        .btn-success { background-color: #5cb85c; }
+        .btn-warning { background-color: #f0ad4e; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .task-list {
+            list-style: none;
+            padding: 0;
+        }
+        .task-item {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-right: 6px solid #ccc;
+        }
+        .task-details {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: white;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>📋 Yuval OS</h1>
+            <p>ניהול החיים המשותפים של יובל ואליען</p>
+        </div>
+        <div>
+            <button class="btn btn-warning" onclick="exportToCalendar('personal')">📥 ייצא ליומן אישי</button>
+            <button class="btn btn-success" onclick="exportToCalendar('shared')">📥 ייצא ליומן משותף</button>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- ניהול קטגוריות -->
+        <div class="card">
+            <h2>🛠️ ניהול קטגוריות ותתי קטגוריות</h2>
+            <div class="form-group">
+                <label>שם קטגוריה חדשה</label>
+                <input type="text" id="new_cat_name" class="form-control" placeholder="למשל: לימודים, עבודה, חתונה...">
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="is_sub_cat" onchange="toggleSubCatSelect()">
+                <label for="is_sub_cat">זוהי תת-קטגוריה</label>
+            </div>
+            <div class="form-group" id="parent_cat_div" style="display:none; margin-top:10px;">
+                <label>שייכת לקטגוריית אם:</label>
+                <select id="parent_cat_select" class="form-control"></select>
+            </div>
+            <button class="btn" style="margin-top:10px;" onclick="addCategory()">➕ הוסף קטגוריה</button>
+        </div>
+
+        <!-- הוספת משימה -->
+        <div class="card">
+            <h2>📝 הוספת משימה חדשה</h2>
+            <div class="form-group">
+                <label>תוכן המשימה</label>
+                <input type="text" id="task_text" class="form-control" placeholder="מה צריך לעשות?">
+            </div>
+            <div class="form-group">
+                <label>בחר קטגוריה</label>
+                <select id="task_cat_select" class="form-control" onchange="loadSubCategoriesForTask()"></select>
+            </div>
+            <div class="form-group" id="task_sub_cat_div" style="display:none;">
+                <label>בחר תת-קטגוריה</label>
+                <select id="task_sub_cat_select" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label>לאיזה יומן לשלוח?</label>
+                <select id="calendar_target" class="form-control">
+                    <option value="personal">👤 יומן אישי (יובל בלבד)</option>
+                    <option value="shared">👥 יומן משותף (יובל + אליען)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>סוג משימה</label>
+                <select id="task_type" class="form-control" onchange="toggleTaskTypeFields()">
+                    <option value="once">📅 חד-פעמית (תאריך יעד)</option>
+                    <option value="recurring">🔄 משימה אוטומטית/מחזורית</option>
+                </select>
+            </div>
+            <div class="form-group" id="date_field">
+                <label>תאריך יעד</label>
+                <input type="date" id="task_date" class="form-control">
+            </div>
+            <div class="form-group" id="recurring_field" style="display:none;">
+                <label>כל כמה זמן היא חוזרת?</label>
+                <select id="recurring_period" class="form-control">
+                    <option value="1">כל יום ראשון</option>
+                    <option value="2">כל יום שני</option>
+                    <option value="3">כל יום שלישי</option>
+                    <option value="4">כל יום רביעי</option>
+                    <option value="5">כל יום חמישי</option>
+                    <option value="6">כל יום שישי</option>
+                    <option value="10">כל 10 לחודש</option>
+                </select>
+            </div>
+            <button class="btn btn-success" onclick="saveTask()">💾 שמור משימה</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📌 בנק המשימות הפתוחות שלכם</h2>
+        <ul id="tasks_container" class="task-list"></ul>
+    </div>
+</div>
+
+<script>
+    let data = JSON.parse(localStorage.getItem('yuval_os_data')) || { categories: {}, tasks: [] };
+    const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
+
+    function saveData() {
+        localStorage.setItem('yuval_os_data', JSON.stringify(data));
+        renderCategories();
+        renderTasks();
+    }
+
+    function toggleSubCatSelect() {
+        const isSub = document.getElementById('is_sub_cat').checked;
+        document.getElementById('parent_cat_div').style.display = isSub ? 'block' : 'none';
+    }
+
+    function toggleTaskTypeFields() {
+        const type = document.getElementById('task_type').value;
+        document.getElementById('date_field').style.display = type === 'once' ? 'block' : 'none';
+        document.getElementById('recurring_field').style.display = type === 'recurring' ? 'block' : 'none';
+    }
+
+    function addCategory() {
+        const name = document.getElementById('new_cat_name').value.trim();
+        const isSub = document.getElementById('is_sub_cat').checked;
+        if (!name) return;
+
+        if (isSub) {
+            const parent = document.getElementById('parent_cat_select').value;
+            if (parent && data.categories[parent] && !data.categories[parent].subs.includes(name)) {
+                data.categories[parent].subs.push(name);
+            }
+        } else {
+            if (!data.categories[name]) {
+                data.categories[name] = { color: colors[Object.keys(data.categories).length % colors.length], subs: [] };
+            }
+        }
+        document.getElementById('new_cat_name').value = '';
+        document.getElementById('is_sub_cat').checked = false;
+        toggleSubCatSelect();
+        saveData();
+    }
+
+    function renderCategories() {
+        const parentSelect = document.getElementById('parent_cat_select');
+        const taskCatSelect = document.getElementById('task_cat_select');
+        parentSelect.innerHTML = '';
+        taskCatSelect.innerHTML = '<option value="">ללא קטגוריה</option>';
+        Object.keys(data.categories).forEach(cat => {
+            parentSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            taskCatSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+        loadSubCategoriesForTask();
+    }
+
+    function loadSubCategoriesForTask() {
+        const cat = document.getElementById('task_cat_select').value;
+        const subDiv = document.getElementById('task_sub_cat_div');
+        const subSelect = document.getElementById('task_sub_cat_select');
+        if (cat && data.categories[cat] && data.categories[cat].subs.length > 0) {
+            subDiv.style.display = 'block';
+            subSelect.innerHTML = '<option value="">ללא תת-קטגוריה</option>';
+            data.categories[cat].subs.forEach(sub => { subSelect.innerHTML += `<option value="${sub}">${sub}</option>`; });
+        } else {
+            subDiv.style.display = 'none';
+            subSelect.innerHTML = '';
+        }
+    }
+
+    function saveTask() {
+        const text = document.getElementById('task_text').value.trim();
+        const cat = document.getElementById('task_cat_select').value;
+        const subCat = document.getElementById('task_sub_cat_select').value;
+        const target = document.getElementById('calendar_target').value;
+        const type = document.getElementById('task_type').value;
+        const date = document.getElementById('task_date').value;
+        const recurring = document.getElementById('recurring_period').value;
+        if (!text) return;
+
+        const task = { id: Date.now(), text, cat, subCat, target, type, date, recurring, completed: false };
+        data.tasks.push(task);
+        document.getElementById('task_text').value = '';
+        saveData();
+    }
+
+    function completeTask(id) {
+        data.tasks = data.tasks.filter(t => t.id !== id);
+        saveData();
+    }
+
+    function renderTasks() {
+        const container = document.getElementById('tasks_container');
+        container.innerHTML = '';
+        data.tasks.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(task => {
+            const catColor = task.cat && data.categories[task.cat] ? data.categories[task.cat].color : '#ccc';
+            let badgeHtml = task.cat ? `<span class="badge" style="background-color:${catColor}">${task.cat}</span>` : '';
+            if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${catColor}cc">${task.subCat}</span>`;
+            let timeInfo = task.type === 'once' ? `📅 יעד: ${task.date}` : `🔄 מחזורי`;
+            container.innerHTML += `
+                <li class="task-item" style="border-right-color: ${catColor}">
+                    <div class="task-details">
+                        <strong>${task.text}</strong>
+                        <div>${badgeHtml} <span style="font-size:12px; color:#666; margin-right:10px;">${timeInfo} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'}</span></div>
+                    </div>
+                    <button class="btn btn-success" onclick="completeTask(${task.id})">✓ בוצע</button>
+                </li>`;
+        });
+    }
+
+    // --- מנגנון ייצוא מקצועי לקובצי יומן סטנדרטיים ---
+    function exportToCalendar(targetType) {
+        const filteredTasks = data.tasks.filter(t => t.target === targetType && t.date);
+        if (filteredTasks.length === 0) {
+            alert('אין משימות עם תאריך יעד המיועדות ליומן זה.');
+            return;
+        }
+
+        let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Yuval OS//Task Manager//HE\n";
+        
+        filteredTasks.forEach(task => {
+            const cleanDate = task.date.replace(/-/g, '');
+            icsContent += "BEGIN:VEVENT\n";
+            icsContent += `SUMMARY:${task.text}\n`;
+            icsContent += `DESCRIPTION:קטגוריה: ${task.cat || 'כללי'} ${task.subCat ? '> ' + task.subCat : ''}\n`;
+            icsContent += `DTSTART;VALUE=DATE:${cleanDate}\n`;
+            icsContent += `DTEND;VALUE=DATE:${cleanDate}\n`;
+            icsContent += "END:VEVENT\n";
+        });
+        
+        icsContent += "END:VCALENDAR";
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", targetType === 'shared' ? 'shared_calendar.ics' : 'personal_calendar.ics');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    window.onload = () => {
+        renderCategories();
+        renderTasks();
+    };
+</script>
+</body>
+</html>
