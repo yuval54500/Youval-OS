@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Youval OS - ניהול משימות חכם</title>
+    <title>Youval OS - ניהйн משימות חכם</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
@@ -182,7 +182,7 @@
     </div>
 
     <div class="grid">
-        <!-- ניהול קטגוריות (חזר למקור!) -->
+        <!-- ניהול קטגוריות -->
         <div class="card">
             <h2>🛠️ ניהול קטגוריות ותתי קטגוריות</h2>
             <div class="form-group">
@@ -270,7 +270,6 @@
     const SHARED_CALENDAR_ID = '79c3497590a3980fa6a8365d56eef732023565b633b193ad9de5fb95ba65b13c@group.calendar.google.com'; 
     const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
     
-    // חיבור הענן הרשמי והנקי שלך
     const FIREBASE_URL = 'https://yuval-os-default-rtdb.firebaseio.com'; 
 
     let tokenClient;
@@ -281,13 +280,27 @@
     let data = { categories: {}, tasks: [] };
     const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
 
-    // טעינת המשימות הסטריליות שלך מהענן
     async function loadCloudData() {
         try {
             const response = await fetch(`${FIREBASE_URL}/data.json`);
             if (response.ok) {
                 const cloudData = await response.json();
-                if (cloudData) {
+                
+                // מנגנון הגירה ושחזור חכם:
+                // אם הענן ריק לגמרי, נבדוק אם יש נתונים מקומיים ישנים על המחשב
+                if (!cloudData) {
+                    const localOldData = JSON.parse(localStorage.getItem('yuval_os_data'));
+                    if (localOldData && (Object.keys(localOldData.categories).length > 0 || localOldData.tasks.length > 0)) {
+                        data = {
+                            categories: localOldData.categories || {},
+                            tasks: localOldData.tasks || []
+                        };
+                        console.log("נתונים ישנים נמצאו במחשב! מעביר אותם לענן עכשיו...");
+                        await saveCloudData(); // מעלה אותם מיד לענן
+                        return;
+                    }
+                } else {
+                    // אם יש נתונים בענן, טוענים אותם כרגיל
                     data = {
                         categories: cloudData.categories || {},
                         tasks: cloudData.tasks ? Object.values(cloudData.tasks) : []
@@ -299,7 +312,6 @@
         renderTasks();
     }
 
-    // שמירה ישירות לענן
     async function saveCloudData() {
         try {
             await fetch(`${FIREBASE_URL}/data.json`, {
