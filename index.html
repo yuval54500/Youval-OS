@@ -76,6 +76,12 @@
             border-radius: 6px;
             box-sizing: border-box;
         }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
         .task-list {
             list-style: none;
             padding: 0;
@@ -98,6 +104,15 @@
             flex-direction: column;
             gap: 5px;
         }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: white;
+            margin-left: 5px;
+        }
         .task-date-display {
             font-weight: bold;
             color: #2c3e50;
@@ -105,6 +120,34 @@
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 13px;
+        }
+        .cat-badge-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .cat-delete-item {
+            background: #eee;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            padding-bottom: 5px;
+            color: #888;
+        }
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--primary-color);
         }
         .category-section-title {
             font-size: 18px;
@@ -121,12 +164,6 @@
             font-style: italic;
             margin-bottom: 15px;
         }
-        .loader {
-            text-align: center;
-            color: #666;
-            font-style: italic;
-            padding: 20px;
-        }
     </style>
 </head>
 <body>
@@ -135,28 +172,35 @@
     <div class="header">
         <div>
             <h1>📋 Youval OS</h1>
-            <p>ניהול החיים המשותפים של יובל ואליען (סנכרון ענן מלא)</p>
+            <p>ניהול החיים המשותפים של יובל ואליען</p>
         </div>
         <div>
             <button id="auth_btn" class="btn btn-success" onclick="handleAuthClick()">🔘 התחבר לחשבון גוגל</button>
             <button id="signout_btn" class="btn btn-danger" style="display:none;" onclick="handleSignoutClick()">נתק חשבון</button>
-            <span id="status_span" style="font-weight: bold; color: #5cb85c; display: none; margin-right: 10px;">✓ מחובר לענן</span>
+            <span id="status_span" style="font-weight: bold; color: #5cb85c; display: none; margin-right: 10px;">✓ מחובר אוטומטית לגוגל</span>
         </div>
     </div>
 
     <div class="grid">
-        <!-- הגדרת קטגוריות מהירה קבועה במערכת -->
+        <!-- ניהול קטגוריות -->
         <div class="card">
-            <h2>🛠️ מדריך קטגוריות מובנה</h2>
-            <p>המערכת מזהה אוטומטית את הקטגוריה לפי מה שייכתב ביומן. הקטגוריות המובנות שלכם:</p>
-            <ul>
-                <li>💍 <strong>הפקת החתונה</strong></li>
-                <li>🏋️‍♂️ <strong>כושר ותזונה</strong></li>
-                <li>🏡 <strong>תחזוקת הבית והגינה</strong></li>
-                <li>💰 <strong>פיננסים והשקעות</strong></li>
-                <li>🎓 <strong>לימודים</strong></li>
-            </ul>
-            <p style="font-size: 13px; color: #666;">* המערכת תצבע ותסדר כל משימה לפי הזיהוי שלה באופן אוטומטי.</p>
+            <h2>🛠️ ניהול קטגוריות ותתי קטגוריות</h2>
+            <div class="form-group">
+                <label>שם קטגוריה חדשה</label>
+                <input type="text" id="new_cat_name" class="form-control" placeholder="למשל: לימודים, עבודה, חתונה...">
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="is_sub_cat" onchange="toggleSubCatSelect()">
+                <label for="is_sub_cat">זוהי תת-קטגוריה</label>
+            </div>
+            <div class="form-group" id="parent_cat_div" style="display:none; margin-top:10px;">
+                <label>שייכת לקטגוריית אם:</label>
+                <select id="parent_cat_select" class="form-control"></select>
+            </div>
+            <button class="btn" style="margin-top:10px;" onclick="addCategory()">➕ הוסף קטגוריה</button>
+            
+            <h3 style="margin-top: 20px; font-size: 16px;">קטגוריות קיימות (לחץ על X למחיקה):</h3>
+            <div id="cat_delete_container" class="cat-badge-list"></div>
         </div>
 
         <!-- הוספת משימה -->
@@ -166,16 +210,15 @@
                 <label>תוכן המשימה</label>
                 <input type="text" id="task_text" class="form-control" placeholder="מה צריך לעשות?">
             </div>
-            <div class="form-group">
-                <label>שיוך לקטגוריה</label>
-                <select id="task_cat_select" class="form-control">
-                    <option value="הפקת החתונה">💍 הפקת החתונה</option>
-                    <option value="כושר ותזונה">🏋️‍♂️ כושר ותזונה</option>
-                    <option value="תחזוקת הבית והגינה">🏡 תחזוקת הבית והגינה</option>
-                    <option value="פיננסים והשקעות">💰 פיננסים והשקעות</option>
-                    <option value="לימודים">🎓 לימודים</option>
-                    <option value="כללי">⚪ כללי / ללא קטגוריה</option>
-                </select>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 0;">
+                <div class="form-group">
+                    <label>בחר קטגוריה</label>
+                    <select id="task_cat_select" class="form-control" onchange="loadSubCategoriesForTask()"></select>
+                </div>
+                <div class="form-group" id="task_sub_cat_div" style="display:none;">
+                    <label>בחר תת-קטגוריה</label>
+                    <select id="task_sub_cat_select" class="form-control"></select>
+                </div>
             </div>
             <div class="form-group">
                 <label>לאיזה יומן לשלוח?</label>
@@ -207,14 +250,16 @@
                     <option value="10">כל 10 לחודש</option>
                 </select>
             </div>
-            <button class="btn btn-success" style="width: 100%; margin-top: 10px;" onclick="saveTask()">💾 שמור וסנכרן לענן</button>
+            <button class="btn btn-success" style="width: 100%; margin-top: 10px;" onclick="saveTask()">💾 שמור וסנכרן אוטומטית</button>
         </div>
     </div>
 
-    <!-- בנק המשימות החיות -->
+    <!-- בנק המשימות עם לשוניות -->
     <div class="card">
-        <h2>📌 בנק המשימות הפתוחות שלכם (מסונכרן בזמן אמת)</h2>
-        <div id="loading_status" class="loader" style="display:none;">טוען משימות חיות מתוך היומנים של גוגל...</div>
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <button id="tab_open" class="tab-btn active" onclick="switchTab('open')">📌 משימות פתוחות</button>
+            <button id="tab_completed" class="tab-btn" onclick="switchTab('completed')">✅ משימות שהושלמו</button>
+        </div>
         <div id="tasks_grouped_container"></div>
     </div>
 </div>
@@ -224,19 +269,57 @@
     const PERSONAL_CALENDAR_ID = 'yuval54500@gmail.com';
     const SHARED_CALENDAR_ID = '79c3497590a3980fa6a8365d56eef732023565b633b193ad9de5fb95ba65b13c@group.calendar.google.com'; 
     const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+    
+    // הקישור החדש והרשמי שלך אחי
+    const FIREBASE_URL = 'https://yuval-os-default-rtdb.firebaseio.com/'; 
 
     let tokenClient;
     let accessToken = null;
-    let fetchedTasks = [];
+    let currentTab = 'open';
+    let pendingTask = null;
 
-    const categoryMeta = {
-        'הפקת החתונה': { color: '#9b59b6' },
-        'כושר ותזונה': { color: '#5cb85c' },
-        'תחזוקת הבית והגינה': { color: '#e67e22' },
-        'פיננסים והשקעות': { color: '#f1c40f' },
-        'לימודים': { color: '#4a90e2' },
-        'כללי': { color: '#95a5a6' }
-    };
+    let data = { categories: {}, tasks: [] };
+    const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
+
+    async function loadCloudData() {
+        try {
+            const response = await fetch(`${FIREBASE_URL}/data.json`);
+            if (response.ok) {
+                const cloudData = await response.json();
+                if (cloudData) {
+                    data = {
+                        categories: cloudData.categories || {},
+                        tasks: cloudData.tasks ? Object.values(cloudData.tasks) : []
+                    };
+                }
+            }
+        } catch (e) { console.error("Error loading cloud data", e); }
+        renderCategories();
+        renderTasks();
+    }
+
+    async function saveCloudData() {
+        try {
+            await fetch(`${FIREBASE_URL}/data.json`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        } catch (e) { console.error("Error saving cloud data", e); }
+        renderCategories();
+        renderTasks();
+    }
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.getElementById('tab_open').classList.toggle('active', tab === 'open');
+        document.getElementById('tab_completed').classList.toggle('active', tab === 'completed');
+        renderTasks();
+    }
+
+    function toggleSubCatSelect() {
+        const isSub = document.getElementById('is_sub_cat').checked;
+        document.getElementById('parent_cat_div').style.display = isSub ? 'block' : 'none';
+    }
 
     function toggleTaskTypeFields() {
         const type = document.getElementById('task_type').value;
@@ -244,13 +327,75 @@
         document.getElementById('recurring_field').style.display = type === 'recurring' ? 'block' : 'none';
     }
 
-    function switchTab(tab) {
-        renderTasks();
+    function addCategory() {
+        const name = document.getElementById('new_cat_name').value.trim();
+        const isSub = document.getElementById('is_sub_cat').checked;
+        if (!name) return;
+
+        if (isSub) {
+            const parent = document.getElementById('parent_cat_select').value;
+            if (parent && data.categories[parent] && !data.categories[parent].subs.includes(name)) {
+                data.categories[parent].subs.push(name);
+            }
+        } else {
+            if (!data.categories[name]) {
+                data.categories[name] = { color: colors[Object.keys(data.categories).length % colors.length], subs: [] };
+            }
+        }
+        document.getElementById('new_cat_name').value = '';
+        document.getElementById('is_sub_cat').checked = false;
+        toggleSubCatSelect();
+        saveCloudData();
     }
 
-    async function saveTask() {
+    function deleteCategory(catName) {
+        if (confirm(`האם אתה בטוח שברצונך למחוק את הקטגוריה "${catName}"?`)) {
+            delete data.categories[catName];
+            data.tasks.forEach(t => { if(t.cat === catName) { t.cat = ''; t.subCat = ''; } });
+            saveCloudData();
+        }
+    }
+
+    function renderCategories() {
+        const parentSelect = document.getElementById('parent_cat_select');
+        const taskCatSelect = document.getElementById('task_cat_select');
+        const deleteContainer = document.getElementById('cat_delete_container');
+        
+        if(!parentSelect) return;
+        parentSelect.innerHTML = '';
+        taskCatSelect.innerHTML = '<option value="">ללא קטגוריה</option>';
+        deleteContainer.innerHTML = '';
+
+        Object.keys(data.categories).forEach(cat => {
+            parentSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            taskCatSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+            deleteContainer.innerHTML += `
+                <div class="cat-delete-item" style="border-right: 4px solid ${data.categories[cat].color}">
+                    <span>${cat}</span>
+                    <strong style="color:red; cursor:pointer;" onclick="deleteCategory('${cat}')">✕</strong>
+                </div>`;
+        });
+        loadSubCategoriesForTask();
+    }
+
+    function loadSubCategoriesForTask() {
+        const cat = document.getElementById('task_cat_select').value;
+        const subDiv = document.getElementById('task_sub_cat_div');
+        const subSelect = document.getElementById('task_sub_cat_select');
+        if (cat && data.categories[cat] && data.categories[cat].subs.length > 0) {
+            subDiv.style.display = 'block';
+            subSelect.innerHTML = '<option value="">ללא תת-קטגוריה</option>';
+            data.categories[cat].subs.forEach(sub => { subSelect.innerHTML += `<option value="${sub}">${sub}</option>`; });
+        } else {
+            subDiv.style.display = 'none';
+            subSelect.innerHTML = '';
+        }
+    }
+
+    function saveTask() {
         const text = document.getElementById('task_text').value.trim();
         const cat = document.getElementById('task_cat_select').value;
+        const subCat = document.getElementById('task_sub_cat_select').value;
         const target = document.getElementById('calendar_target').value;
         const type = document.getElementById('task_type').value;
         let date = document.getElementById('task_date').value;
@@ -261,123 +406,105 @@
             date = getNextStartDate(recurring);
         }
 
-        const task = { text, cat, target, type, date, recurring };
+        const task = { id: 'task_' + Date.now(), text, cat, subCat, target, type, date, recurring, completed: false };
         
+        data.tasks.push(task);
+        document.getElementById('task_text').value = '';
+        saveCloudData();
+
         if (accessToken) {
-            await sendEventToGoogleDirectly(task);
-            document.getElementById('task_text').value = '';
-            fetchLiveTasks(); // רענון רשימה מיידי מהענן
+            sendEventToGoogleDirectly(task);
         } else {
-            alert("אנא התחבר לגוגל בראש העמוד לפני שמירת משימות.");
+            pendingTask = task;
+            tokenClient.requestAccessToken({prompt: ''});
         }
     }
 
-    async function deleteLiveEvent(calendarId, eventId) {
-        if (!confirm("האם ברצונך למחוק משימה זו לצמיתות מהיומן?")) return;
-        
-        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`;
-        try {
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            if (response.ok) {
-                alert("המשימה נמחקה בהצלחה מהענן!");
-                fetchLiveTasks();
+    function completeTask(id) {
+        const task = data.tasks.find(t => t.id === id);
+        if (task) {
+            if (task.type === 'recurring') {
+                let d = new Date(task.date);
+                d.setDate(d.getDate() + 7);
+                let year = d.getFullYear();
+                let month = String(d.getMonth() + 1).padStart(2, '0');
+                let day = String(d.getDate()).padStart(2, '0');
+                task.date = `${year}-${month}-${day}`;
+                alert(`בוצע אחי! המועד הבא עודכן ליום: ${task.date}`);
+            } else {
+                task.completed = true;
             }
-        } catch (error) {
-            console.error(error);
+            saveCloudData();
         }
     }
 
-    async function fetchLiveTasks() {
-        if (!accessToken) return;
-        document.getElementById('loading_status').style.display = 'block';
-        fetchedTasks = [];
-
-        // משיכת אירועים משני היומנים במקביל
-        await Promise.all([
-            getEventsFromCalendar(PERSONAL_CALENDAR_ID, 'personal'),
-            getEventsFromCalendar(SHARED_CALENDAR_ID, 'shared')
-        ]);
-
-        document.getElementById('loading_status').style.display = 'none';
-        renderTasks();
-    }
-
-    async function getEventsFromCalendar(calendarId, targetType) {
-        const now = new Date().toISOString();
-        const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${now}&singleEvents=true&orderBy=startTime&maxResults=50`;
-        
-        try {
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.items) {
-                    data.items.forEach(item => {
-                        // מנסה לזהות קטגוריה מתוך התיאור של האירוע בגוגל
-                        let cat = 'כללי';
-                        if (item.description && item.description.includes('קטגוריה:')) {
-                            const parsedCat = item.description.replace('קטגוריה:', '').trim();
-                            if (categoryMeta[parsedCat]) cat = parsedCat;
-                        }
-                        
-                        fetchedTasks.push({
-                            id: item.id,
-                            calendarId: calendarId,
-                            text: item.summary,
-                            date: item.start.date || item.start.dateTime.split('T')[0],
-                            cat: cat,
-                            target: targetType
-                        });
-                    });
-                }
-            }
-        } catch (error) {
-            console.error(error);
+    function deleteTask(id) {
+        if (confirm("למחוק את המשימה לחלוטין מהמערכת?")) {
+            data.tasks = data.tasks.filter(t => t.id !== id);
+            saveCloudData();
         }
     }
 
     function renderTasks() {
         const mainContainer = document.getElementById('tasks_grouped_container');
+        if(!mainContainer) return;
         mainContainer.innerHTML = '';
+        
+        const filteredTasks = data.tasks.filter(t => currentTab === 'open' ? !t.completed : t.completed);
 
-        if (fetchedTasks.length === 0) {
-            mainContainer.innerHTML = `<div class="no-tasks-msg">אין משימות קרובות מסונכרנות ביומנים.</div>`;
+        if (filteredTasks.length === 0) {
+            mainContainer.innerHTML = `<div class="no-tasks-msg">אין משימות להצגה בלשונית זו.</div>`;
             return;
         }
 
-        // מיון כללי כרונולוגי של המשימות שנשאבו
-        fetchedTasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+        const categoriesToGroup = [...Object.keys(data.categories), ''];
 
-        // קיבוץ והצגה לפי קטגוריות
-        Object.keys(categoryMeta).forEach(catName => {
-            const catTasks = fetchedTasks.filter(t => t.cat === catName);
+        categoriesToGroup.forEach(catName => {
+            const catTasks = filteredTasks.filter(t => t.cat === catName);
+            
             if (catTasks.length === 0) return;
 
-            const borderCol = categoryMeta[catName].color;
+            catTasks.sort((a, b) => {
+                if (!a.date) return 1;
+                if (!b.date) return -1;
+                return new Date(a.date) - new Date(b.date);
+            });
+
+            const displayTitle = catName ? `📂 קטגוריה: ${catName}` : `⚪ ללא קטגוריה`;
+            const borderCol = catName && data.categories[catName] ? data.categories[catName].color : '#ccc';
+
             let sectionHtml = `
                 <div class="category-section" style="margin-bottom: 20px;">
                     <div class="category-section-title" style="color: ${borderCol}; border-bottom: 2px solid ${borderCol}44;">
-                        📂 ${catName} (${catTasks.length})
+                        ${displayTitle} (${catTasks.length})
                     </div>
                     <ul class="task-list" style="padding: 0; list-style: none;">
             `;
 
             catTasks.forEach(task => {
-                let dateBadge = `<span class="task-date-display">📅 תאריך: ${task.date}</span>`;
+                let badgeHtml = task.cat ? `<span class="badge" style="background-color:${borderCol}">${task.cat}</span>` : '';
+                if (task.subCat) badgeHtml += `<span class="badge" style="background-color:${borderCol}cc">${task.subCat}</span>`;
+                let dateBadge = task.date ? `<span class="task-date-display">📅 תאריך: ${task.date}</span>` : `<span class="task-date-display">ללא תאריך</span>`;
+                let typeLabel = task.type === 'once' ? `חד-פעמי` : `🔄 מחזורי`;
+
+                let actionButtons = currentTab === 'open' ? 
+                    `<div>
+                        <button class="btn btn-success btn-small" onclick="completeTask('${task.id}')">✓ בוצע</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteTask('${task.id}')">🗑️ מחק</button>
+                    </div>` : 
+                    `<button class="btn btn-danger btn-small" onclick="deleteTask('${task.id}')">🗑️ מחק מההיסטוריה</button>`;
+
                 sectionHtml += `
                     <li class="task-item" style="border-right: 6px solid ${borderCol};">
                         <div class="task-details">
-                            <strong>${task.text}</strong>
+                            <strong style="${task.completed ? 'text-decoration: line-through; color: #888;' : ''}">${task.text}</strong>
                             <div style="margin-top: 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                ${badgeHtml} 
                                 ${dateBadge}
-                                <span style="font-size:12px; color:#666;">(${task.target === 'shared' ? '👥 משותף' : '👤 אישי'})</span>
+                                <span style="font-size:12px; color:#666;">(${typeLabel} | ${task.target === 'shared' ? '👥 משותף' : '👤 אישי'})</span>
                             </div>
                         </div>
-                        <button class="btn btn-danger btn-small" onclick="deleteLiveEvent('${task.calendarId}', '${task.id}')">✕ מחק / בוצע</button>
+                        ${actionButtons}
                     </li>`;
             });
 
@@ -386,7 +513,7 @@
         });
     }
 
-    // --- Google Identity Services ---
+    // --- Google Calendar Integration ---
     function gisLoaded() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID, scope: SCOPES, callback: (resp) => {
@@ -395,21 +522,21 @@
                 document.getElementById('auth_btn').style.display = 'none';
                 document.getElementById('status_span').style.display = 'inline';
                 document.getElementById('signout_btn').style.display = 'inline-block';
-                fetchLiveTasks(); // שואב את המשימות ישירות בחיבור
+                
+                if (pendingTask) {
+                    sendEventToGoogleDirectly(pendingTask);
+                    pendingTask = null;
+                }
             },
         });
     }
     
-    function handleAuthClick() {
-        tokenClient.requestAccessToken({prompt: 'consent'});
-    }
-    
+    function handleAuthClick() { tokenClient.requestAccessToken({prompt: 'consent'}); }
     function handleSignoutClick() {
-        accessToken = null;
+        if (accessToken !== null) { google.accounts.oauth2.revoke(accessToken); accessToken = null; }
         document.getElementById('auth_btn').style.display = 'inline-block';
         document.getElementById('status_span').style.display = 'none';
         document.getElementById('signout_btn').style.display = 'none';
-        document.getElementById('tasks_grouped_container').innerHTML = '';
     }
 
     function getNextStartDate(target) {
@@ -430,20 +557,18 @@
     async function sendEventToGoogleDirectly(task) {
         let event = {
             'summary': task.text,
-            'description': `קטגוריה: ${task.cat}`,
+            'description': `קטגוריה: ${task.cat || 'כללי'} ${task.subCat ? '> ' + task.subCat : ''}`,
         };
 
         if (task.type === 'once') {
             event.start = { 'date': task.date || new Date().toISOString().split('T')[0], 'timeZone': 'Asia/Jerusalem' };
             event.end = { 'date': task.date || new Date().toISOString().split('T')[0], 'timeZone': 'Asia/Jerusalem' };
         } else {
-            event.start = { 'date': task.date, 'timeZone': 'Asia/Jerusalem' };
-            event.end = { 'date': task.date, 'timeZone': 'Asia/Jerusalem' };
-            if (task.recurring === '10') {
-                event.recurrence = ['RRULE:FREQ=MONTHLY;BYMONTHDAY=10'];
-            } else {
-                event.recurrence = [`RRULE:FREQ=WEEKLY;BYDAY=${task.recurring}`];
-            }
+            const calculatedDate = getNextStartDate(task.recurring);
+            event.start = { 'date': calculatedDate, 'timeZone': 'Asia/Jerusalem' };
+            event.end = { 'date': calculatedDate, 'timeZone': 'Asia/Jerusalem' };
+            if (task.recurring === '10') { event.recurrence = ['RRULE:FREQ=MONTHLY;BYMONTHDAY=10']; } 
+            else { event.recurrence = [`RRULE:FREQ=WEEKLY;BYDAY=${task.recurring}`]; }
         }
 
         const calendarId = task.target === 'shared' ? encodeURIComponent(SHARED_CALENDAR_ID) : encodeURIComponent(PERSONAL_CALENDAR_ID); 
@@ -455,15 +580,12 @@
                 headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(event)
             });
-            if (response.ok) {
-                alert(`המשימה "${task.text}" נשמרה וסונכרנה לענן של גוגל!`);
-            }
-        } catch (error) {
-            console.error(error);
-        }
+            if (response.ok) { alert(`המשימה "${task.text}" סונכרנה אוטומטית ליומן גוגל!`); }
+        } catch (error) { console.error(error); }
     }
 
     window.onload = () => {
+        loadCloudData();
         gisLoaded();
     };
 </script>
