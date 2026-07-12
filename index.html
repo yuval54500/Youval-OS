@@ -182,7 +182,7 @@
     </div>
 
     <div class="grid">
-        <!-- ניהול קטגוריות -->
+        <!-- ניהול קטגוריות (חזר למקור!) -->
         <div class="card">
             <h2>🛠️ ניהול קטגוריות ותתי קטגוריות</h2>
             <div class="form-group">
@@ -270,8 +270,8 @@
     const SHARED_CALENDAR_ID = '79c3497590a3980fa6a8365d56eef732023565b633b193ad9de5fb95ba65b13c@group.calendar.google.com'; 
     const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
     
-    // הקישור החדש והרשמי שלך אחי
-    const FIREBASE_URL = 'https://yuval-os-default-rtdb.firebaseio.com/'; 
+    // חיבור הענן הרשמי והנקי שלך
+    const FIREBASE_URL = 'https://yuval-os-default-rtdb.firebaseio.com'; 
 
     let tokenClient;
     let accessToken = null;
@@ -281,6 +281,7 @@
     let data = { categories: {}, tasks: [] };
     const colors = ['#4a90e2', '#5cb85c', '#f0ad4e', '#d9534f', '#9b59b6', '#1abc9c', '#34495e'];
 
+    // טעינת המשימות הסטריליות שלך מהענן
     async function loadCloudData() {
         try {
             const response = await fetch(`${FIREBASE_URL}/data.json`);
@@ -298,6 +299,7 @@
         renderTasks();
     }
 
+    // שמירה ישירות לענן
     async function saveCloudData() {
         try {
             await fetch(`${FIREBASE_URL}/data.json`, {
@@ -361,7 +363,7 @@
         const taskCatSelect = document.getElementById('task_cat_select');
         const deleteContainer = document.getElementById('cat_delete_container');
         
-        if(!parentSelect) return;
+        if(!parentSelect || !taskCatSelect || !deleteContainer) return;
         parentSelect.innerHTML = '';
         taskCatSelect.innerHTML = '<option value="">ללא קטגוריה</option>';
         deleteContainer.innerHTML = '';
@@ -382,6 +384,7 @@
         const cat = document.getElementById('task_cat_select').value;
         const subDiv = document.getElementById('task_sub_cat_div');
         const subSelect = document.getElementById('task_sub_cat_select');
+        if(!subDiv || !subSelect) return;
         if (cat && data.categories[cat] && data.categories[cat].subs.length > 0) {
             subDiv.style.display = 'block';
             subSelect.innerHTML = '<option value="">ללא תת-קטגוריה</option>';
